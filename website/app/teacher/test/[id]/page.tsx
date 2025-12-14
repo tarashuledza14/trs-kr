@@ -20,16 +20,18 @@ import {
 import { resultsApi } from '@/lib/api/results';
 import { testsApi } from '@/lib/api/tests';
 import { usersApi } from '@/lib/api/users';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle, Copy } from 'lucide-react';
 import Link from 'next/link';
-import { redirect, useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export default function TestResultsPage() {
 	const params = useParams();
+	const router = useRouter();
 	const testId = params.id as string;
 	const [copied, setCopied] = useState(false);
+	const queryClient = useQueryClient();
 
 	const { data: test } = useQuery({
 		queryKey: ['test', testId],
@@ -47,6 +49,15 @@ export default function TestResultsPage() {
 		queryFn: () => usersApi.studentsList(),
 	});
 
+	const { mutate: deleteTest } = useMutation({
+		mutationKey: ['delete-test', testId],
+		mutationFn: (data: string) => testsApi.delete(data),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['tests'] });
+			router.replace('/teacher/dashboard');
+		},
+	});
+
 	const getStudentName = (studentId: string) => {
 		const student = students.find(s => s.id === studentId);
 		return student?.name || 'Невідомий студент';
@@ -57,11 +68,6 @@ export default function TestResultsPage() {
 		navigator.clipboard.writeText(url);
 		setCopied(true);
 		setTimeout(() => setCopied(false), 2000);
-	};
-
-	const deleteTest = () => {
-		testsApi.delete(testId);
-		redirect('/teacher/dashboard');
 	};
 
 	if (!test) {
@@ -109,7 +115,7 @@ export default function TestResultsPage() {
 									</>
 								)}
 							</Button>
-							<Button variant='destructive' onClick={deleteTest}>
+							<Button variant='destructive' onClick={() => deleteTest(testId)}>
 								Видалити тест
 							</Button>
 						</div>
